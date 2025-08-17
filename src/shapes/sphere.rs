@@ -1,81 +1,56 @@
-use crate::shapes::Intersects;
-use crate::vector::Vec3;
-use image::Rgb;
+use crate::hittable::{HitRecord, Hittable};
+use crate::material::Material;
+use crate::math::{ray::Ray, vec3::Vec3};
+use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Sphere {
     center: Vec3<f64>,
     radius: f64,
-    colour: Rgb<u8>,
-}
-
-pub trait Shape {
-    fn name(&self) -> &'static str;
+    material: Arc<dyn Material>,
 }
 
 impl Sphere {
-    pub fn new(center: Vec3<f64>, radius: f64) -> Self {
+    pub fn new(center: Vec3<f64>, radius: f64, material: Arc<dyn Material>) -> Self {
         Self {
             center,
             radius,
-            colour: Rgb([255, 255, 255]),
+            material,
         }
-    }
-
-    pub fn get_normal(&self, point: &Vec3<f64>) -> Vec3<f64> {
-        (*point - self.center).normalize()
-    }
-
-    pub fn change_colour(&mut self, colour: Rgb<u8>) {
-        self.colour = colour;
-    }
-
-    pub fn get_colour(&self) -> Rgb<u8> {
-        self.colour
     }
 }
 
-impl Intersects for Sphere {
-    fn does_intersect(&self, ray_pos: &Vec3<f64>, ray_dir: &Vec3<f64>) -> Option<f64> {
-        let v = *ray_pos - self.center;
-        let a = ray_dir.dot(&ray_dir);
-        let b = 2.0 * ray_dir.dot(&v);
-        let c = v.dot(&v) - (self.radius * self.radius);
-        let discriminant = b * b - 4.0 * a * c;
+impl Hittable for Sphere {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let oc = ray.origin - self.center;
+        let a = ray.direction.length_squared();
+        let half_b = oc.dot(&ray.direction);
+        let c = oc.length_squared() - self.radius * self.radius;
+        let discriminant = half_b * half_b - a * c;
 
         if discriminant < 0.0 {
             return None;
         }
 
-        match super::solve_quadratic(a, b, c) {
-            Some(t) => return Some(t),
-            _ => return None,
-        };
-    }
-}
+        let sqrtd = discriminant.sqrt();
+        let mut root = (-half_b - sqrtd) / a;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+        if root < t_min || root > t_max {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || root > t_max {
+                return None;
+            }
+        }
 
-    #[test]
-    fn intersects_sphere() {
-        let s1 = Sphere::new(Vec3::new(0.0, 0.0, -5.0), 2.0);
+        let t = root;
+        let point = ray.at(t);
+        let normal = (point - self.center) / self.radius;
 
-        let ray_pos = Vec3::new(0.0, 0.0, 0.0);
-        let ray_dir = Vec3::new(0.0, 0.0, -1.0);
-        let x = s1.does_intersect(&ray_pos, &ray_dir);
-        assert!(x.is_some(), "Incorrect sphere miss");
-    }
-
-    #[test]
-    #[should_panic]
-    fn not_intersecting_sphere() {
-        let s1 = Sphere::new(Vec3::new(0.0, 0.0, -5.0), 2.0);
-
-        let ray_pos = Vec3::new(0.0, 0.0, 0.0);
-        let ray_dir = Vec3::new(0.0, 0.0, 1.0);
-        let x = s1.does_intersect(&ray_pos, &ray_dir);
-        assert!(x.is_some(), "Incorrect sphere intersection");
+        Some(HitRecord {
+            t,
+            point,
+            normal,
+            material: Arc::clone(&self.material),
+        })
     }
 }

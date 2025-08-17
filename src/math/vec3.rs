@@ -1,7 +1,8 @@
 use num_traits::{Float, Zero};
+use serde::Deserialize;
 use std::ops::{Add, Div, Mul, Sub};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct Vec3<T> {
     pub x: T,
     pub y: T,
@@ -87,17 +88,30 @@ where
     }
 }
 
-impl<T, E> Mul<E> for Vec3<T>
+impl<T> Mul<T> for Vec3<T>
 where
-    T: Mul<E, Output = T> + Copy,
-    E: Copy,
+    T: Mul<Output = T> + Copy,
 {
     type Output = Self;
-    fn mul(self, rhs: E) -> Self::Output {
+    fn mul(self, rhs: T) -> Self::Output {
         Vec3 {
             x: self.x * rhs,
             y: self.y * rhs,
             z: self.z * rhs,
+        }
+    }
+}
+
+impl<T> Mul<Vec3<T>> for Vec3<T>
+where
+    T: Mul<Output = T> + Copy,
+{
+    type Output = Self;
+    fn mul(self, rhs: Vec3<T>) -> Self::Output {
+        Vec3 {
+            x: self.x * rhs.x,
+            y: self.y * rhs.y,
+            z: self.z * rhs.z,
         }
     }
 }
@@ -125,7 +139,6 @@ mod tests {
     fn test_addition() {
         let v1 = Vec3::new(0.0, 1.0, 2.0);
         let v2 = Vec3::new(0.0, 1.0, 2.0);
-
         let v3 = v1 + v2;
         assert_eq!(v3, Vec3::new(0.0, 2.0, 4.0));
     }
@@ -134,16 +147,23 @@ mod tests {
     fn test_sub() {
         let v1 = Vec3::new(1.0, 2.0, 3.0);
         let v2 = Vec3::new(0.0, 1.0, 2.0);
-
         let v3 = v1 - v2;
         assert_eq!(v3, Vec3::new(1.0, 1.0, 1.0));
     }
 
     #[test]
-    fn test_mult() {
+    fn test_scalar_mult() {
         let v1 = Vec3::new(2.0, 3.0, 4.0);
         let v2 = v1 * 2.0;
         assert_eq!(v2, Vec3::new(4.0, 6.0, 8.0));
+    }
+
+    #[test]
+    fn test_vec_mult() {
+        let v1 = Vec3::new(2.0, 3.0, 4.0);
+        let v2 = Vec3::new(2.0, 3.0, 4.0);
+        let v3 = v1 * v2;
+        assert_eq!(v3, Vec3::new(4.0, 9.0, 16.0));
     }
 
     #[test]
@@ -157,7 +177,7 @@ mod tests {
     #[should_panic]
     fn test_div_by_0() {
         let v1 = Vec3::new(1.0, 2.0, 3.0);
-        let v2 = v1 / 0.0;
+        let _v2 = v1 / 0.0;
     }
 
     #[test]

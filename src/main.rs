@@ -1,32 +1,40 @@
-use shapes::sphere::Sphere;
-use shapes::Shapes::Spheres;
-use vector::Vec3;
+use ray_tracer::{definitions::load_scene_from_file, renderer::Renderer};
 
-mod create_image;
-mod shapes;
-mod vector;
-
-fn main() {
+fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Need an output location.");
+    if args.len() < 3 {
+        eprintln!("Usage: {} <path/to/scene.json> <output_path.png>", args[0]);
         std::process::exit(1);
     }
+    let scene_path = &args[1];
+    let output_path = &args[2];
 
-    let filepath = &args[1];
+    // --- Render Quality Settings ---
+    const SAMPLES_PER_PIXEL: u32 = 100;
 
-    let mut image = create_image::Image::new(1000, 1000);
+    println!("Loading scene from: '{}'...", scene_path);
 
-    let circle = Sphere::new(Vec3::new(0.0, 3.0, -10.0), 0.2);
-    let mut circle2 = Sphere::new(Vec3::new(0.0, -5.0, -10.0), 2.0);
+    // --- Scene Loading ---
+    let scene = match load_scene_from_file(scene_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error loading scene: {}", e);
+            std::process::exit(1);
+        }
+    };
 
-    circle2.change_colour(image::Rgb([255, 0, 200]));
+    // --- Rendering ---
+    let renderer = Renderer::new(SAMPLES_PER_PIXEL);
 
-    image.add_shape(Spheres(circle));
-    image.add_shape(Spheres(circle2));
+    println!("Rendering with {} samples per pixel...", SAMPLES_PER_PIXEL);
+    let image_buffer = renderer.render(&scene);
 
-    image.draw_image();
+    println!("Saving image to {}...", output_path);
+    image_buffer
+        .save(output_path)
+        .expect("Failed to save image.");
 
-    image.create_image(filepath);
+    println!("Done.");
+
+    Ok(())
 }
