@@ -1,21 +1,23 @@
+use clap::Parser;
 use ray_tracer::{definitions::load_scene_from_file, renderer::Renderer};
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    scene_path: String,
+
+    output_path: String,
+
+    #[arg(short, long, default_value_t = 100)]
+    samples: u32,
+}
+
 fn main() -> std::io::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
-        eprintln!("Usage: {} <path/to/scene.json> <output_path.png>", args[0]);
-        std::process::exit(1);
-    }
-    let scene_path = &args[1];
-    let output_path = &args[2];
+    let args = Args::parse();
 
-    // --- Render Quality Settings ---
-    const SAMPLES_PER_PIXEL: u32 = 100;
+    println!("Loading scene from: '{}'...", &args.scene_path);
 
-    println!("Loading scene from: '{}'...", scene_path);
-
-    // --- Scene Loading ---
-    let scene = match load_scene_from_file(scene_path) {
+    let scene = match load_scene_from_file(&args.scene_path) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("Error loading scene: {}", e);
@@ -24,14 +26,14 @@ fn main() -> std::io::Result<()> {
     };
 
     // --- Rendering ---
-    let renderer = Renderer::new(SAMPLES_PER_PIXEL);
+    let renderer = Renderer::new(args.samples);
 
-    println!("Rendering with {} samples per pixel...", SAMPLES_PER_PIXEL);
+    println!("Rendering with {} samples per pixel...", args.samples);
     let image_buffer = renderer.render(&scene);
 
-    println!("Saving image to {}...", output_path);
+    println!("Saving image to {}...", &args.output_path);
     image_buffer
-        .save(output_path)
+        .save(&args.output_path)
         .expect("Failed to save image.");
 
     println!("Done.");
