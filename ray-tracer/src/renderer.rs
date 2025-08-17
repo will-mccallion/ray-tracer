@@ -1,10 +1,9 @@
-// src/renderer.rs
-
 use crate::math::vec3::Vec3;
 use crate::scene::Scene;
 use image::{Rgb, RgbImage};
-// --- NEW: Import the necessary components from indicatif ---
 use indicatif::{ProgressBar, ProgressStyle};
+use rand::Rng;
+use rayon::prelude::*;
 
 pub struct Renderer {
     pub samples_per_pixel: u32,
@@ -25,36 +24,60 @@ impl Renderer {
             .expect("Failed to create progress bar template")
             .progress_chars("#>-"));
 
-        for py in 0..scene.camera.height {
-            for px in 0..scene.camera.width {
+        let pixels: Vec<(u32, u32)> = (0..scene.camera.height)
+            .flat_map(|y| (0..scene.camera.width).map(move |x| (x, y)))
+            .collect();
+
+        let rendered_pixels: Vec<Rgb<u8>> = pixels
+            .into_par_iter()
+            .map(|(px, py)| {
+                pb.inc(1);
+
+                let mut rng = rand::thread_rng();
                 let mut pixel_color = Vec3::new(0.0, 0.0, 0.0);
 
-                for _s in 0..self.samples_per_pixel {
-                    let u = (px as f64 + rand::random::<f64>()) / (scene.camera.width - 1) as f64;
-                    let v = (py as f64 + rand::random::<f64>()) / (scene.camera.height - 1) as f64;
-                    let ray = scene.camera.get_ray(u, 1.0 - v);
-                    pixel_color = pixel_color + self.trace_ray(&ray, scene);
+                let samples_sqrt = (self.samples_per_pixel as f64).sqrt() as u32;
+                let samples_per_side = if samples_sqrt == 0 { 1 } else { samples_sqrt };
+
+                for i in 0..samples_per_side {
+                    for j in 0..samples_per_side {
+                        let u = (px as f64
+                            + (i as f64 + rng.r#gen::<f64>()) / samples_per_side as f64)
+                            / (scene.camera.width - 1) as f64;
+
+                        let v = (py as f64
+                            + (j as f64 + rng.r#gen::<f64>()) / samples_per_side as f64)
+                            / (scene.camera.height - 1) as f64;
+
+                        let ray = scene.camera.get_ray(u, 1.0 - v);
+                        pixel_color = pixel_color + self.trace_ray(&ray, scene);
+                    }
                 }
 
-                pixel_color = pixel_color / self.samples_per_pixel as f64;
+                let total_samples = (samples_per_side * samples_per_side) as f64;
+                pixel_color = pixel_color / total_samples;
 
+                // Gamma Correction
                 let r = pixel_color.x.powf(0.5);
                 let g = pixel_color.y.powf(0.5);
                 let b = pixel_color.z.powf(0.5);
 
-                let final_color = Rgb([
+                Rgb([
                     (r.clamp(0.0, 0.999) * 256.0) as u8,
                     (g.clamp(0.0, 0.999) * 256.0) as u8,
                     (b.clamp(0.0, 0.999) * 256.0) as u8,
-                ]);
+                ])
+            })
+            .collect();
 
-                image_buffer.put_pixel(px, py, final_color);
+        pb.finish_with_message("Parallel rendering complete. Writing to image...");
 
-                pb.inc(1);
-            }
+        for (i, pixel) in rendered_pixels.into_iter().enumerate() {
+            let x = i as u32 % scene.camera.width;
+            let y = i as u32 / scene.camera.width;
+            image_buffer.put_pixel(x, y, pixel);
         }
 
-        pb.finish_with_message("Render complete!");
         image_buffer
     }
 

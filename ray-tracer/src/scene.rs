@@ -1,5 +1,3 @@
-// src/scene.rs
-
 use crate::{camera::Camera, hittable::Hittable, light::PointLight, math::vec3::Vec3};
 use image::Rgb;
 
