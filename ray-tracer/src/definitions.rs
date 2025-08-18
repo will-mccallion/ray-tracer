@@ -1,5 +1,3 @@
-use definitions::MeshDef as MeshDataFile;
-
 use crate::{
     camera::Camera,
     hittable::Hittable,
@@ -53,7 +51,9 @@ struct SphereDef {
 
 #[derive(Deserialize)]
 struct MeshDef {
-    path: String,
+    vertices: Vec<Vec3<f64>>,
+    indices: Vec<[usize; 3]>,
+    normals: Vec<Vec3<f64>>,
     material: MaterialDef,
 }
 
@@ -114,24 +114,12 @@ impl ObjectDef {
 
 impl MeshDef {
     fn build(self) -> Mesh {
-        let mesh_data_str = std::fs::read_to_string(&self.path)
-            .unwrap_or_else(|_| panic!("Failed to load mesh data file: {}", self.path));
-
-        let mesh_data: MeshDataFile = serde_json::from_str(&mesh_data_str)
-            .unwrap_or_else(|_| panic!("Failed to parse mesh data from: {}", self.path));
-
-        let vertices = mesh_data
-            .vertices
-            .into_iter()
-            .map(|v| Vec3::new(v.x, v.y, v.z))
-            .collect();
-        let normals = mesh_data
-            .normals
-            .into_iter()
-            .map(|n| Vec3::new(n.x, n.y, n.z))
-            .collect();
-
-        Mesh::new(vertices, mesh_data.indices, normals, self.material.build())
+        Mesh::new(
+            self.vertices,
+            self.indices,
+            self.normals,
+            self.material.build(),
+        )
     }
 }
 
